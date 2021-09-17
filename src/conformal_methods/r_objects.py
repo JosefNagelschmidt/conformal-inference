@@ -28,10 +28,10 @@ def numpy_matrix_to_r_matrix(np_mat):
 
 
 class QuantregForest(BaseEstimator, RegressorMixin):
-    def __init__(self, loss="quantile", alpha=np.array([0.9]), nodesize=5, mtry=1,
+    def __init__(self, loss="quantile", quantile_to_fit=np.array([0.9]), nodesize=5, mtry=1,
                  ntree=100): # params here are only specified due to GridSearchCV, which needs to find those as attributes
         self.loss = loss
-        self.alpha = alpha
+        self.quantile_to_fit = quantile_to_fit
         self.nodesize = nodesize
         self.mtry = mtry
         self.ntree = ntree
@@ -71,5 +71,5 @@ class QuantregForest(BaseEstimator, RegressorMixin):
             }
         """)
         
-        preds = pred_forest(forest=self.fitted_quant_reg_forest_, X_test=X_r, alpha=self.alpha)
+        preds = pred_forest(forest=self.fitted_quant_reg_forest_, X_test=X_r, alpha=self.quantile_to_fit)
         return preds
