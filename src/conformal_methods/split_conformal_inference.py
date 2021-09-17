@@ -44,7 +44,7 @@ class SplitConformalRegressor(BaseEstimator, RegressorMixin):
      
         return estimator
     
-    def fit(self, X, y, params={}):
+    def fit(self, X, y, params={}): 
         # checks
         estimator = self._check_estimator(self.estimator)
         X, y = check_X_y(X, y, force_all_finite=False, dtype=["float64", "int", "object"])
@@ -65,8 +65,31 @@ class SplitConformalRegressor(BaseEstimator, RegressorMixin):
             self.rho_hat_ = estimator(**params).fit(X_train, self.fitted_abs_res_)
 
         if self.method == "quantile-based":
-            # is it necessary to specify the alpha grid quantiles for later prediction in the params dictionary at this point
-            self.fitted_quant_reg_forest_ = estimator(**params).fit(X_train, y_train)
+            if ("quantile_to_fit" in params):
+                if (len(params["quantile_to_fit"]) == 2):
+                    # this quantile_to_fit param is unique for the quantregForest from Meinshausen (2006), 
+                    # since alpha is the param for the quantiles to fit
+                    self.fitted_quant_reg_forest_both_ = estimator(**params).fit(X_train, y_train)
+                    self.quantiles_to_fit_ = np.array(params["quantile_to_fit"])
+                else:
+                    raise ValueError("The quantile_to_fit param must have length of two.")
+
+            elif (isinstance(self.estimator(), BaseGradientBoosting)) & ("loss" in params):
+                if (len(params["alpha"]) == 2):
+                    lower_params = deepcopy(params)
+                    upper_params = deepcopy(params)
+                    lower_params["alpha"] = lower_params["alpha"][0]
+                    upper_params["alpha"] = upper_params["alpha"][1]
+
+                    self.fitted_quant_reg_forest_lower_ = estimator(**lower_params).fit(X_train, y_train)
+                    self.fitted_quant_reg_forest_upper_ = estimator(**upper_params).fit(X_train, y_train)
+                    self.quantiles_to_fit_ = np.array(params["alpha"])
+                    
+                else:
+                    raise ValueError("The alpha param must have length of two.")
+
+            else:
+                raise ValueError("Invalid estimator or params. Please provide a quantile regression estimator with the corresponding params.")
 
         return self
 
@@ -126,19 +149,44 @@ class SplitConformalRegressor(BaseEstimator, RegressorMixin):
             return res
         
         if self.method == "quantile-based":
-            check_is_fitted(self,["fitted_quant_reg_forest_"])
+            if hasattr(self, "fitted_quant_reg_forest_both_"):
+                check_is_fitted(self,["fitted_quant_reg_forest_both_"])
+                self.quantiles_to_fit_
+                assert len(self.quantiles_to_fit_) == 2
+                # generate upper and lower quantile estimates at the same time for both sets
+                y_conf_hat = self.fitted_quant_reg_forest_both_.predict(self.X_conf_)
+                y_pred_hat = self.fitted_quant_reg_forest_both_.predict(X_pred)
 
-            assert len(self.fitted_quant_reg_forest_.alpha) == 2
-            y_conf_hat = self.fitted_quant_reg_forest_.predict(self.X_conf_)
-            y_pred_hat = self.fitted_quant_reg_forest_.predict(X_pred)
+                conf_scores = CQR_conformity_score(lower_quant_hat=y_conf_hat[:, 0], upper_quant_hat=y_conf_hat[:, 1], y_conf=self.y_conf_)
+                k = (1 - alpha) * (1.0 / len(self.y_conf_) + 1)
+                d = np.quantile(conf_scores, k)
 
-            conf_scores = CQR_conformity_score(lower_quant_hat=y_conf_hat[:, 0], upper_quant_hat=y_conf_hat[:, 1], y_conf=self.y_conf_)
-            k = (1 - alpha) * (1.0 / len(self.y_conf_) + 1)
-            d = np.quantile(conf_scores, k)
+                pred_band_upper = y_pred_hat[:, 1] + d
+                pred_band_lower = y_pred_hat[:, 0] - d
 
-            pred_band_upper = y_pred_hat[:, 1] + d
-            pred_band_lower = y_pred_hat[:, 0] - d
+                res = np.stack((pred_band_lower.flatten(), pred_band_upper.flatten()), axis=1)
 
-            res = np.stack((pred_band_lower.flatten(), pred_band_upper.flatten()), axis=1)
+            elif (hasattr(self, "fitted_quant_reg_forest_lower_")) & (hasattr(self, "fitted_quant_reg_forest_upper_")):
+                check_is_fitted(self,["fitted_quant_reg_forest_lower_"])
+                check_is_fitted(self,["fitted_quant_reg_forest_upper_"])
+                assert len(self.quantiles_to_fit_) == 2
+
+                y_conf_hat_lower = self.fitted_quant_reg_forest_lower_.predict(self.X_conf_)
+                y_conf_hat_upper = self.fitted_quant_reg_forest_upper_.predict(self.X_conf_)
+
+                y_pred_hat_lower = self.fitted_quant_reg_forest_lower_.predict(X_pred)
+                y_pred_hat_upper = self.fitted_quant_reg_forest_upper_.predict(X_pred)
+
+                conf_scores = CQR_conformity_score(lower_quant_hat=y_conf_hat_lower, upper_quant_hat=y_conf_hat_upper, y_conf=self.y_conf_)
+                k = (1 - alpha) * (1.0 / len(self.y_conf_) + 1)
+                d = np.quantile(conf_scores, k)
+
+                pred_band_upper = y_pred_hat_upper + d
+                pred_band_lower = y_pred_hat_lower - d
+
+                res = np.stack((pred_band_lower.flatten(), pred_band_upper.flatten()), axis=1)
+            
+            else:
+                raise ValueError("No correct quantile regressor was fitted previously.")
+
             return res
-
