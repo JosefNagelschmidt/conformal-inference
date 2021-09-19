@@ -195,6 +195,31 @@ def get_oracle_intervals(means, variances):
     return result
 
 
+def share_signif_fun(oracle_intervals, ite_pred_intervals):
+    which_oracle_ints_signif = np.logical_not((oracle_intervals[:,0] <= 0) & (oracle_intervals[:,1] >= 0))
+    which_predicted_ints_signif = np.logical_not((ite_pred_intervals[:,0] <= 0) & (ite_pred_intervals[:,1] >= 0))
+    oracle_signif_signs = np.sign(np.mean(oracle_intervals, axis=1))
+    predicted_signif_signs = np.sign(np.mean(ite_pred_intervals, axis=1))
+    same_sign = (oracle_signif_signs == predicted_signif_signs)
+    correctly_signif_given_oracle_signif = which_oracle_ints_signif & which_predicted_ints_signif & same_sign
+    if np.sum(which_oracle_ints_signif) == 0:
+        return -1.0
+    else:
+        return np.sum(correctly_signif_given_oracle_signif) / np.sum(which_oracle_ints_signif)
+
+def share_signif_oracles(oracle_intervals, ite_vals):
+    which_oracle_ints_signif = np.logical_not((oracle_intervals[:,0] <= 0) & (oracle_intervals[:,1] >= 0))
+    which_ites_not_zero = (ite_vals != 0)
+    signif_oracles_given_ite_not_zero = which_oracle_ints_signif & which_ites_not_zero
+    return np.sum(signif_oracles_given_ite_not_zero) / len(oracle_intervals)
+
+def share_signif_intervals_given_ite_not_zero(ite_pred_intervals, ite_vals):
+    which_predicted_ints_signif = np.logical_not((ite_pred_intervals[:,0] <= 0) & (ite_pred_intervals[:,1] >= 0))
+    which_ites_not_zero = (ite_vals != 0)
+    signif_intervals_given_ite_not_zero = which_predicted_ints_signif & which_ites_not_zero
+    return np.sum(signif_intervals_given_ite_not_zero) / len(ite_pred_intervals)
+
+
 def generate_treatment_effects_helper(X, treatment_case):
     n, p = X.shape
     if treatment_case == "binary":

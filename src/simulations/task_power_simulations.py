@@ -4,7 +4,7 @@ from src.config import BLD
 from src.config import SRC
 
 from src.conformal_methods.split_conformal_inference import SplitConformalRegressor
-from src.conformal_methods.utils import get_oracle_intervals, calc_normal_params, dgp_ate_zero
+from src.conformal_methods.utils import get_oracle_intervals, calc_normal_params,dgp_ate_zero,share_signif_oracles,share_signif_intervals_given_ite_not_zero
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
@@ -36,6 +36,7 @@ def run_simulation(specs):
     df = pd.DataFrame(
         columns=[
             "mean_oracle_length",
+            "share_signif_oracles_given_ite_nonzero",
             "mse_train_y1",
             "opt_estimator",
 
@@ -50,6 +51,11 @@ def run_simulation(specs):
             
             "mean_interval_length_naive_asymp",
             "mean_coverage_naive_asymp",
+
+            "share_signif_intervals_given_ite_nonzero",
+            "share_signif_asy_intervals_given_ite_nonzero",
+            "share_signif_naive_intervals_given_ite_nonzero",
+            "share_signif_naive_asymp_intervals_given_ite_nonzero",
         ],
         index=index,
     )
@@ -58,11 +64,11 @@ def run_simulation(specs):
     same_case_as_previous_round = False
 
     param_grid_lin_reg = {"fit_intercept": [True]}
-    param_grid_rf = {'n_estimators': [300], 'min_samples_split': [6, 15], "min_samples_leaf": [8]}
+    param_grid_rf = {'n_estimators': [300], 'min_samples_split': [3], "min_samples_leaf": [8]}
     param_grid_grad_boost = {'learning_rate': [0.1], 
                             'n_estimators': [300], 
                             'max_depth': [2],
-                            "min_samples_leaf": [5]}
+                            "min_samples_leaf": [2]}
 
     for index in df.index:
 
@@ -243,7 +249,13 @@ def run_simulation(specs):
        
         df.at[index, "mean_interval_length_naive_asymp"] = mean_interval_length_asy_naive
         df.at[index, "mean_coverage_naive_asymp"] = mean_coverage_asy_naive
-    
+
+        df.at[index, "share_signif_oracles_given_ite_nonzero"] = share_signif_oracles(oracle_intervals=oracle_ints, ite_vals=ite_pred)
+        df.at[index, "share_signif_intervals_given_ite_nonzero"] = share_signif_intervals_given_ite_not_zero(ite_pred_intervals=ite_bands, ite_vals=ite_pred)
+        df.at[index, "share_signif_asy_intervals_given_ite_nonzero"] = share_signif_intervals_given_ite_not_zero(ite_pred_intervals=ite_bands_asy, ite_vals=ite_pred)
+        df.at[index, "share_signif_naive_intervals_given_ite_nonzero"] = share_signif_intervals_given_ite_not_zero(ite_pred_intervals=ite_bands_naive_pl, ite_vals=ite_pred)
+        df.at[index, "share_signif_naive_asymp_intervals_given_ite_nonzero"] = share_signif_intervals_given_ite_not_zero(ite_pred_intervals=ite_bands_asy_naive, ite_vals=ite_pred)
+
         previous_index = index
 
     return df
@@ -255,7 +267,6 @@ def run_simulation(specs):
         (
             {
                 "model": SRC / "simulations" / "specs" / f"{treatment_setup}.json",
-                "script": SRC / "simulations" / "power_simulations.py"
             },
                 BLD / "simulations" / "power_simulations" / f"df_results_{treatment_setup}.csv",
         )

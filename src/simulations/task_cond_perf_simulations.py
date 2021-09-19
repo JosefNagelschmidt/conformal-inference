@@ -14,7 +14,7 @@ def conc_tuples(index_prep, method, i):
 
 # (n, p, X_dist, X_correlation, eps_dist, error_type, functional_form, non_zero_beta_count, uniform_upper, standardized_X, method, sim_id)
 
-n_sims = 200
+n_sims = 5
 process_type = int(argv[1])  # one of: 1,2,3,4
 
 if process_type == 1:
