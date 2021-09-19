@@ -1,0 +1,9 @@
+{
+    "n_sims": 2,
+    "main_effect_cases": ["const", "linear", "non-linear"],
+    "treatment_case": ["binary"],
+    "treatment_grid_density": 2,
+    "p" : [10],
+    "n" : [300],
+    "pred_samples": 2000
+}

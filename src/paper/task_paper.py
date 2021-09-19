@@ -30,7 +30,6 @@ documents = ["research_paper", "research_pres_30min"]
 def task_compile_documents():
     pass
 
-
 @pytask.mark.parametrize(
     "depends_on, produces",
     [
