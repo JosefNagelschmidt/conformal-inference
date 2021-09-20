@@ -128,8 +128,16 @@ def run_simulation(specs, produces):
         else:
             raise ValueError("X has a dimensionality problem, missing regressors.")
 
-        if (index[10] == "mean-based") | (index[10] == "weighted-mean-based"):
+        if (index[10] == "mean-based"):
             reg = SplitConformalRegressor(RandomForestRegressor, method="mean-based", conf_size=1-specs["train_size"], quantiles_to_fit=np.array([0.05,0.95]))
+            reg = reg.fit(X=X_split_again, y=y_split_again, params={"min_samples_leaf": specs["nodesize"],
+                                                              "max_features": max_features,
+                                                              "n_estimators": specs["n_estimators"]})
+
+            res = reg.predict_intervals(X_pred=X_predict, alpha=0.1)
+
+        elif (index[10] == "weighted-mean-based"):
+            reg = SplitConformalRegressor(RandomForestRegressor, method="weighted-mean-based", conf_size=1-specs["train_size"], quantiles_to_fit=np.array([0.05,0.95]))
             reg = reg.fit(X=X_split_again, y=y_split_again, params={"min_samples_leaf": specs["nodesize"],
                                                               "max_features": max_features,
                                                               "n_estimators": specs["n_estimators"]})
@@ -311,7 +319,6 @@ def run_simulation(specs, produces):
     grid = np.linspace(minimum, maximum, 1000)
 
     print("Start.")
-    
     df_mean_based_cleaned.to_csv(produces["conditional_res_mean_based"])
     df_w_mean_based_cleaned.to_csv(produces["conditional_res_w_mean_based"])
     df_quantile_based_cleaned.to_csv(produces["conditional_res_quantile_based"])
@@ -451,7 +458,7 @@ def run_simulation(specs, produces):
     [
         (
             {
-                "model": SRC / "simulations" / "specs" / f"cond_sim_type_{type}.json",
+                "type": SRC / "simulations" / "specs" / f"cond_sim_type_{type}.json",
             },
             {
                 "average_metrics_df": BLD / "simulations" / "cond_perf_simulations" / f"average_results_{type}.csv",
@@ -468,5 +475,5 @@ def run_simulation(specs, produces):
 )
 def task_cond_perf_simulations(depends_on, produces):
     # dictionary imported into "specs":
-    specs = json.loads(depends_on["model"].read_text(encoding="utf-8"))
+    specs = json.loads(depends_on["type"].read_text(encoding="utf-8"))
     run_simulation(specs, produces)

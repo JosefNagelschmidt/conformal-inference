@@ -9,9 +9,9 @@
     "non_zero_beta_count": 1,
     "uniform_upper": 5,
     "standardized_X": 0,
-    "n_sims": 5,
-    "pred_samples": 300,
+    "n_sims": 25,
+    "pred_samples": 125,
     "train_size": 0.7,
-    "nodesize": 10,
-    "n_estimators": 100
+    "nodesize": 50,
+    "n_estimators": 700
 }

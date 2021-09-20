@@ -1,4 +1,8 @@
 import numpy as np 
+import pandas as pd
+
+from src.config import SRC
+
 from numba import jit
 from scipy.stats import norm
 from scipy.stats import skewnorm
@@ -523,3 +527,22 @@ def construc_cond_metric_df_simulation(x_scale, result_pred_bands, y_predict):
     )
     df = np.stack((x_scale, interval_lengths, covered), axis=1)
     return df
+
+def get_conditional_variances(process_type):
+    if (
+        process_type == 3
+    ):  # chernozhukov example distributional conformal prediction (2021)
+        x_grid = np.linspace(0, 1, 2000)
+        return x_grid, np.array(x_grid) ** 2
+    if process_type == 4:  # romano table
+        src = str(SRC)
+        df = pd.read_csv(src + "/simulations/helper_tables/romano_table_cond_variances.csv")
+        return np.array(df["X"]), np.array(df["cond_var"])
+    if process_type == 2:
+        x_grid = np.linspace(0, 5, 2000)
+        cond_var = 1 + x_grid ** 2
+        return x_grid, cond_var
+    if process_type == 1:
+        x_grid = np.linspace(-5, 5, 2000)
+        cond_var = 2 * (1 + (2 * np.abs(x_grid) ** 3) / 38.73) ** 2
+        return x_grid, cond_var
