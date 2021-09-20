@@ -1,0 +1,17 @@
+{
+    "n": 200,
+    "p": 10,
+    "X_dist": "mixture",
+    "X_correlation": "pair",
+    "eps_dist": "t",
+    "error_type": "varying_third_moment_mu",
+    "functional_form": "linear",
+    "non_zero_beta_count": 5,
+    "uniform_upper": 1,
+    "standardized_X": 1,
+    "n_sims": 5,
+    "pred_samples": 300,
+    "train_size": 0.7,
+    "nodesize": 10,
+    "n_estimators": 100
+}

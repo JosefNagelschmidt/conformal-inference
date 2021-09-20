@@ -1,0 +1,17 @@
+{
+    "n": 1000,
+    "p": 100,
+    "X_dist": "uniform",
+    "X_correlation": "none",
+    "eps_dist": "normal",
+    "error_type": "varying_squared_linear_part",
+    "functional_form": "sine",
+    "non_zero_beta_count": 5,
+    "uniform_upper": 1,
+    "standardized_X": 0,
+    "n_sims": 5,
+    "pred_samples": 300,
+    "train_size": 0.7,
+    "nodesize": 10,
+    "n_estimators": 100
+}

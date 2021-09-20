@@ -353,3 +353,173 @@ def generate_X_fixed_positions(
         X = scaler.transform(X)
 
     return X
+
+
+def flatten(l):
+    new_l = []
+    for tup in l:
+        sublist = []
+        for i, subelement in enumerate(tup):
+            if isinstance(subelement, tuple):
+                for j in subelement:
+                    sublist.append(j)
+            else:
+                sublist.append(subelement)
+        new_l.append(tuple(sublist))
+    return new_l
+
+def generate_y_fixed_positions(
+    X_mat,
+    eps_dist="normal",
+    error_type="const",
+    functional_form="linear",
+    sigma=1,
+    force_beta_positive=True,
+    non_zero_beta_count=None,
+    magnitude_nonzero_coeffs=1,
+    signal_noise_ratio=None,
+    alpha=5,
+    df=4,
+):
+
+    n, p = X_mat.shape
+
+    if non_zero_beta_count is None:
+        non_zero_beta_count = int(np.ceil(p / 10))
+
+    if non_zero_beta_count is not None:
+        if non_zero_beta_count > p:
+            raise ValueError(
+                "Number of non-zero coefficients cannot exceed the number of covariates in X."
+            )
+        else:
+            non_zero_beta_count = int(non_zero_beta_count)
+
+    # calculate the linear part of the conditional expectation function, or the error multiplicator:
+    # Sample s variables uniformly at random, define true coefficients
+
+    if eps_dist == "t":
+        non_zero_coeffs = np.array([0, 4, 6, 8, 9])
+        beta = np.zeros(p)
+        beta[non_zero_coeffs] = np.random.choice(
+            np.array([-1, 1]) * magnitude_nonzero_coeffs,
+            size=non_zero_beta_count,
+            replace=True,
+        )
+        if force_beta_positive:
+            beta = np.abs(beta)
+        linear_part = X_mat @ beta
+
+    else:
+        non_zero_coeffs = np.arange(non_zero_beta_count)
+        beta = np.zeros(p)
+        beta[non_zero_coeffs] = np.random.choice(
+            np.array([-1, 1]) * magnitude_nonzero_coeffs,
+            size=non_zero_beta_count,
+            replace=True,
+        )
+        if force_beta_positive:
+            beta = np.abs(beta)
+        linear_part = X_mat @ beta
+
+    # main effect:
+    if functional_form == "linear":
+        mu = linear_part
+
+    elif functional_form == "sine":
+        mu = 2 * np.sin(np.pi * linear_part) + np.pi * linear_part
+
+    elif functional_form == "stochastic_poisson":
+        if p > 1:
+            raise ValueError("This dgp can only be initialized with p = 1.")
+        else:
+            x = X_mat.flatten()
+            ax = 0 * x
+            for i in range(len(x)):
+                ax[i] = np.random.poisson(np.sin(x[i]) ** 2 + 0.1) + 0.03 * x[
+                    i
+                ] * np.random.randn(1)
+                ax[i] += 25 * (np.random.uniform(0, 1, 1) < 0.01) * np.random.randn(1)
+            y = ax.astype(np.float32)
+            return y
+
+    else:
+        raise ValueError("Please specify regular functional form.")
+
+    # error:
+    if eps_dist == "normal":
+        eps = np.random.normal(0, 1, n)
+
+    elif eps_dist == "uniform":
+        eps = np.random.uniform(0, 1, n)
+
+    elif eps_dist == "t":
+        eps = np.random.standard_t(df=df, size=n)
+
+    elif eps_dist == "skewed_normal":
+        eps = skewnorm.rvs(alpha, size=n)
+
+    else:
+        raise ValueError("Please specify regular error distribution.")
+
+    if error_type == "const":
+        sx = np.ones(n)
+        sigma_vec = sigma * sx
+
+    elif error_type == "simple_linear":
+        sx = linear_part
+        sigma_vec = sigma * sx
+
+    elif error_type == "varying_third_moment_mu":
+        sx = 1 + 2 * np.abs(linear_part) ** 3 / 38.73
+        sigma_vec = sigma * sx
+
+    elif error_type == "varying_squared_linear_part":
+        sx = np.sqrt(1 + (linear_part) ** 2)
+        sigma_vec = sigma * sx
+
+    else:
+        raise ValueError("Please specify regular error type.")
+
+    assert eps.shape == (n,)
+    assert sigma_vec.shape == (n,)
+    assert mu.shape == (n,)
+
+    if signal_noise_ratio is not None:
+        mu = (
+            mu
+            * np.sqrt(signal_noise_ratio)
+            * np.sqrt(np.mean(sigma_vec ** 2))
+            / np.std(mu)
+        )
+
+    assert mu.shape == (n,)
+    y = mu + eps * sigma_vec
+
+    if functional_form != "stochastic_poisson":
+        return y, eps, sigma_vec, mu, beta
+
+
+def x_scale(X_mat, error_type, linear_part=None):
+    if error_type == "simple_linear":
+        scale = X_mat.flatten()
+
+    elif error_type == "varying_squared_linear_part":
+        scale = linear_part
+
+    elif error_type == "varying_third_moment_mu":
+        scale = linear_part
+
+    else:
+        raise ValueError("Please specify regular error_type.")
+
+    return scale
+
+def construc_cond_metric_df_simulation(x_scale, result_pred_bands, y_predict):
+
+    interval_lengths = result_pred_bands[:, 1] - result_pred_bands[:, 0]
+    covered = (y_predict.flatten() >= result_pred_bands[:, 0]) & (
+        y_predict.flatten() <= result_pred_bands[:, 1]
+    )
+    df = np.stack((x_scale, interval_lengths, covered), axis=1)
+    return df
